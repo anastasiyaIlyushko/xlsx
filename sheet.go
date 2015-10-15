@@ -18,6 +18,7 @@ type Sheet struct {
 	Selected    bool
 	SheetViews  []SheetView
 	SheetFormat SheetFormat
+	Drawing     string
 }
 
 type SheetView struct {
@@ -109,6 +110,7 @@ func (s *Sheet) makeXLSXSheet(refTable *RefTable, styles *xlsxStyleSheet) *xlsxW
 	xSheet := xlsxSheetData{}
 	maxRow := 0
 	maxCell := 0
+	worksheet.Drawing.RId = s.Drawing
 
 	if s.Selected {
 		worksheet.SheetViews.SheetView[0].TabSelected = true
