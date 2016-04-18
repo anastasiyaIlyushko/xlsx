@@ -211,7 +211,6 @@ func (f *File) MarshallParts() (map[string]string, error) {
 		}
 		return xml.Header + string(body), nil
 	}
-
 	parts = make(map[string]string)
 	workbook = f.makeWorkbook()
 	sheetIndex := 1
@@ -222,8 +221,10 @@ func (f *File) MarshallParts() (map[string]string, error) {
 	f.styles.reset()
 	for _, sheet := range f.Sheets {
 		xSheet := sheet.makeXLSXSheet(refTable, f.styles)
+
 		rId := fmt.Sprintf("rId%d", sheetIndex)
 		sheetId := strconv.Itoa(sheetIndex)
+
 		sheetPath := fmt.Sprintf("worksheets/sheet%d.xml", sheetIndex)
 		partName := "xl/" + sheetPath
 		types.Overrides = append(
@@ -241,6 +242,16 @@ func (f *File) MarshallParts() (map[string]string, error) {
 		if err != nil {
 			return parts, err
 		}
+
+		sheetRels := xlsxWorkbookRels{}
+		sheetRels.Relationships = sheet.Rels
+
+		partName = fmt.Sprintf("xl/worksheets/_rels/sheet%d.xml.rels", sheetIndex)
+		parts[partName], err = marshal(sheetRels)
+		if err != nil {
+			return parts, err
+		}
+
 		sheetIndex++
 	}
 

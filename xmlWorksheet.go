@@ -21,12 +21,14 @@ type xlsxWorksheet struct {
 	PrintOptions  xlsxPrintOptions  `xml:"printOptions"`
 	PageMargins   xlsxPageMargins   `xml:"pageMargins"`
 	PageSetUp     xlsxPageSetUp     `xml:"pageSetup"`
-	Drawing       xlsxDrawing       `xml:"drawing,omitempty"`
-	HeaderFooter  xlsxHeaderFooter  `xml:"headerFooter"`
+	Drawing       *xlsxDrawing
+	HeaderFooter  xlsxHeaderFooter `xml:"headerFooter"`
+	Rels          xlsxWorkbookRels
 }
 
 type xlsxDrawing struct {
-	RId string `xml:"http://schemas.openxmlformats.org/officeDocument/2006/relationships id,attr"`
+	XMLName xml.Name `xml:"drawing,omitempty"`
+	RId     string   `xml:"http://schemas.openxmlformats.org/officeDocument/2006/relationships id,attr"`
 }
 
 // xlsxHeaderFooter directly maps the headerFooter element in the namespace
@@ -278,8 +280,9 @@ type xlsxC struct {
 	R string `xml:"r,attr"`           // Cell ID, e.g. A1
 	S int    `xml:"s,attr,omitempty"` // Style reference.
 	T string `xml:"t,attr,omitempty"` // Type.
+	F *xlsxF `xml:"f,omitempty"`      // Formula ///!!!Сначала должен идти тег f, а за ним тег v
 	V string `xml:"v,omitempty"`      // Value
-	F *xlsxF `xml:"f,omitempty"`      // Formula
+
 }
 
 // xlsxC directly maps the f element in the namespace

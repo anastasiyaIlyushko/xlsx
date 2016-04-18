@@ -601,7 +601,10 @@ func readSheetFromFile(sc chan *indexedSheet, index int, rsheet xlsxSheet, fi *F
 
 	sheet.SheetFormat.DefaultColWidth = worksheet.SheetFormatPr.DefaultColWidth
 	sheet.SheetFormat.DefaultRowHeight = worksheet.SheetFormatPr.DefaultRowHeight
-	sheet.Drawing = worksheet.Drawing.RId
+
+	if worksheet.Drawing != nil {
+		sheet.Drawing = worksheet.Drawing.RId
+	}
 
 	result.Sheet = sheet
 	sc <- result
@@ -610,7 +613,7 @@ func readSheetFromFile(sc chan *indexedSheet, index int, rsheet xlsxSheet, fi *F
 // readSheetsFromZipFile is an internal helper function that loops
 // over the Worksheets defined in the XSLXWorkbook and loads them into
 // Sheet objects stored in the Sheets slice of a xlsx.File struct.
-func readSheetsFromZipFile(f *zip.File, file *File, sheetXMLMap map[string]string) (map[string]*Sheet, []*Sheet, error) {
+func readSheetsFromZipFile(f *zip.File, file *File, sheetXMLMap map[string]string, worksheetsRels map[string]*zip.File) (map[string]*Sheet, []*Sheet, error) {
 	var workbook *xlsxWorkbook
 	var err error
 	var rc io.ReadCloser
@@ -627,6 +630,28 @@ func readSheetsFromZipFile(f *zip.File, file *File, sheetXMLMap map[string]strin
 		return nil, nil, err
 	}
 	file.Date1904 = workbook.WorkbookPr.Date1904
+
+	//get worksheets relations
+	sheetsRels := make(map[int][]xlsxWorkbookRelation)
+	if len(worksheetsRels) != 0 {
+		for name, f := range worksheetsRels {
+			rc, err = f.Open()
+			if err != nil {
+				return nil, nil, err
+			}
+			decoder = xml.NewDecoder(rc)
+			var rel xlsxWorkbookRels
+			err = decoder.Decode(&rel)
+			if err != nil {
+				return nil, nil, err
+			}
+			i, err := strconv.Atoi(string(name[5]))
+			if err != nil {
+				return nil, nil, err
+			}
+			sheetsRels[i] = rel.Relationships
+		}
+	}
 
 	// Only try and read sheets that have corresponding files.
 	// Notably this excludes chartsheets don't right now
@@ -657,7 +682,9 @@ func readSheetsFromZipFile(f *zip.File, file *File, sheetXMLMap map[string]strin
 		sheetName := workbookSheets[sheet.Index].Name
 		sheetsByName[sheetName] = sheet.Sheet
 		sheet.Sheet.Name = sheetName
+		sheet.Sheet.Rels = sheetsRels[sheet.Index+1]
 		sheets[sheet.Index] = sheet.Sheet
+
 	}
 	return sheetsByName, sheets, nil
 }
@@ -832,6 +859,7 @@ func ReadZipReader(r *zip.Reader) (*File, error) {
 	var v *zip.File
 	var workbook *zip.File
 	var workbookRels *zip.File
+	worksheetsRels := make(map[string]*zip.File)
 	var worksheets map[string]*zip.File
 
 	file = NewFile()
@@ -850,6 +878,10 @@ func ReadZipReader(r *zip.Reader) (*File, error) {
 		case "xl/theme/theme1.xml":
 			themeFile = v
 		default:
+			if strings.Index(v.Name, "xl/worksheets/_rels") != -1 {
+				worksheetsRels[v.Name[20:len(v.Name)-4]] = v
+			}
+
 			if len(v.Name) > 14 {
 				if v.Name[0:13] == "xl/worksheets" {
 					worksheets[v.Name[14:len(v.Name)-4]] = v
@@ -857,6 +889,7 @@ func ReadZipReader(r *zip.Reader) (*File, error) {
 			}
 		}
 	}
+
 	if workbookRels == nil {
 		return nil, fmt.Errorf("xl/_rels/workbook.xml.rels not found in input xlsx.")
 	}
@@ -889,7 +922,7 @@ func ReadZipReader(r *zip.Reader) (*File, error) {
 
 		file.styles = style
 	}
-	sheetsByName, sheets, err = readSheetsFromZipFile(workbook, file, sheetXMLMap)
+	sheetsByName, sheets, err = readSheetsFromZipFile(workbook, file, sheetXMLMap, worksheetsRels)
 	if err != nil {
 		return nil, err
 	}

@@ -19,6 +19,7 @@ type Sheet struct {
 	SheetViews  []SheetView
 	SheetFormat SheetFormat
 	Drawing     string
+	Rels        []xlsxWorkbookRelation
 }
 
 type SheetView struct {
@@ -106,11 +107,17 @@ func (s *Sheet) SetColWidth(startcol, endcol int, width float64) error {
 
 // Dump sheet to its XML representation, intended for internal use only
 func (s *Sheet) makeXLSXSheet(refTable *RefTable, styles *xlsxStyleSheet) *xlsxWorksheet {
+
 	worksheet := newXlsxWorksheet()
 	xSheet := xlsxSheetData{}
 	maxRow := 0
 	maxCell := 0
-	worksheet.Drawing.RId = s.Drawing
+
+	if s.Drawing != "" {
+		worksheet.Drawing = &xlsxDrawing{
+			RId: s.Drawing,
+		}
+	}
 
 	if s.Selected {
 		worksheet.SheetViews.SheetView[0].TabSelected = true
@@ -122,6 +129,7 @@ func (s *Sheet) makeXLSXSheet(refTable *RefTable, styles *xlsxStyleSheet) *xlsxW
 
 	colsXfIdList := make([]int, len(s.Cols))
 	worksheet.Cols = &xlsxCols{Col: []xlsxCol{}}
+
 	for c, col := range s.Cols {
 		XfId := 0
 		if col.Min == 0 {
